@@ -115,7 +115,7 @@ function HelpModal({ open, onClose }) {
         <div className="help-step">
           <span className="help-num">6</span>
           <h3>Scoring rule</h3>
-          <p>The app adds the losing player's coins left as points. Queen +3 is ignored if it would take the winner to the cutoff: 22+ in 25-point games, 11+ in 15-point games.</p>
+          <p>The app adds the losing player's coins left as points. Queen +3 counts until the winner already has 22+ points in 25-point games or 11+ points in 15-point games before that board.</p>
         </div>
         <div className="help-step">
           <span className="help-num">7</span>

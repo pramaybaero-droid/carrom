@@ -65,7 +65,7 @@ function popUndo(m) {
 function awardBoard(m, toKey, oppLeft, queen) {
   if (matchWinner(m)) return m;
   const coinsLeft = Math.max(0, Math.min(9, oppLeft));
-  const queenCounted = !!queen && queenBonusCounts(m, toKey, coinsLeft);
+  const queenCounted = !!queen && queenBonusCounts(m, toKey);
   const queenIgnored = !!queen && !queenCounted;
   const pts = coinsLeft + (queenCounted ? 3 : 0);
   let next = pushUndo(m);

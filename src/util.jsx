@@ -73,10 +73,9 @@ function matchQueenCutoff(match) {
   return Number(match?.queenCutoff) || scoreRules(match?.scoreFormat).queenCutoff;
 }
 
-function queenBonusCounts(match, playerKey, coinsLeft = 0) {
+function queenBonusCounts(match, playerKey) {
   const current = match?.[playerKey]?.setPts || 0;
-  const basePoints = Math.max(0, Math.min(9, Number(coinsLeft) || 0));
-  return current + basePoints + 3 < matchQueenCutoff(match);
+  return current < matchQueenCutoff(match);
 }
 
 function defaultMatch({
