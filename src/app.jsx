@@ -51,6 +51,7 @@ function App() {
   const [view, setView] = React.useState("play"); // play | leaderboard
   const [isAdmin, setIsAdmin] = React.useState(false);
   const [adminOpen, setAdminOpen] = React.useState(false);
+  const [helpOpen, setHelpOpen] = React.useState(false);
   const [syncStatus, setSyncStatus] = React.useState("idle");
 
   const { state, active, createMatch, closeMatch, setActive, updateMatch } = useStore();
@@ -67,8 +68,10 @@ function App() {
     return <>
       <div className="topbar">
         <div className="brand"><BrandMark /><div className="brand-name">Striker <em>/</em> Carrom</div></div>
+        <button className="btn ghost sm" onClick={() => setHelpOpen(true)}>Help</button>
       </div>
       <SignIn onSignedIn={(s) => setSessionState(s)} />
+      <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
     </>;
   }
 
@@ -126,6 +129,7 @@ function App() {
           <button className={`tab ${view==="play"?"active":""}`} onClick={() => setView("play")}>Play</button>
           <button className={`tab ${view==="leaderboard"?"active":""}`} onClick={() => setView("leaderboard")}>Leaderboard</button>
           {syncPill}
+          <button className="btn ghost sm" onClick={() => setHelpOpen(true)}>Help</button>
           <span className="chip hide-sm" style={{ color: "var(--cream)" }}>
             <span style={{ color: "var(--gold)" }}>●</span> {session.name}
           </span>
@@ -163,15 +167,16 @@ function App() {
                      onDelete={deleteFromCloud} />
       )}
 
-      {view === "play" && !active && <Welcome onStart={onStartFromWelcome} />}
+      {view === "play" && !active && <Welcome onStart={onStartFromWelcome} onHelp={() => setHelpOpen(true)} />}
       {view === "play" && active?.phase === "toss" && <Toss match={active} onDone={onTossDone} />}
       {view === "play" && active && (active.phase === "live" || active.phase === "over") && (
         <Scoreboard match={active}
           onUpdate={(u) => updateMatch(active.id, u)}
           onClose={() => { if (confirm("Close this match locally? Cloud copy stays.")) closeMatch(active.id); }} />
       )}
-      {view === "play" && active?.phase === "setup" && <Welcome onStart={onStartFromWelcome} />}
+      {view === "play" && active?.phase === "setup" && <Welcome onStart={onStartFromWelcome} onHelp={() => setHelpOpen(true)} />}
 
+      <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
       <AdminPanel open={adminOpen} onClose={() => setAdminOpen(false)}
                   isAdmin={isAdmin} setIsAdmin={setIsAdmin} />
     </>

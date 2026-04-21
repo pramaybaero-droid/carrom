@@ -3,7 +3,6 @@
 function Toss({ match, onDone }) {
   const [phase, setPhase] = React.useState("idle"); // idle | spinning | winner | choosing
   const [winner, setWinner] = React.useState(null); // "p1" | "p2"
-  const [side, setSide] = React.useState(null);     // "White" | "Black" (only if choice==="side")
 
   const p1 = match.p1, p2 = match.p2;
 

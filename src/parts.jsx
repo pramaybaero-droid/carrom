@@ -62,7 +62,7 @@ function Confetti({ trigger, onDone }) {
   );
 }
 
-function Modal({ open, onClose, children }) {
+function Modal({ open, onClose, children, className = "" }) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e) => { if (e.key === "Escape") onClose && onClose(); };
@@ -72,8 +72,61 @@ function Modal({ open, onClose, children }) {
   if (!open) return null;
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>{children}</div>
+      <div className={`modal ${className}`} onClick={e => e.stopPropagation()}>{children}</div>
     </div>
+  );
+}
+
+function HelpModal({ open, onClose }) {
+  return (
+    <Modal open={open} onClose={onClose} className="help-modal">
+      <div className="stinger">App Guide</div>
+      <h2>How to use <em>Striker.</em></h2>
+      <p className="help-intro">
+        Use this app to run a best-of-3 carrom match, track every board, move between sets automatically, and keep a match history.
+      </p>
+
+      <div className="help-grid">
+        <div className="help-step">
+          <span className="help-num">1</span>
+          <h3>Enter players</h3>
+          <p>Type both player names and tap Toss the Striker. Do not choose White or Black here. Coin color is decided after the toss.</p>
+        </div>
+        <div className="help-step">
+          <span className="help-num">2</span>
+          <h3>Toss and break</h3>
+          <p>Flip the striker. The toss winner chooses either Break first or Choose your side. Break first automatically means White coins.</p>
+        </div>
+        <div className="help-step">
+          <span className="help-num">3</span>
+          <h3>Choose side</h3>
+          <p>If the toss winner chooses a side instead of breaking, they pick White or Black and the opponent breaks first.</p>
+        </div>
+        <div className="help-step">
+          <span className="help-num">4</span>
+          <h3>Enter points</h3>
+          <p>After each board, enter how many coins the losing player has left, turn Queen on only if covered, then tap the board winner.</p>
+        </div>
+        <div className="help-step">
+          <span className="help-num">5</span>
+          <h3>Scoring rule</h3>
+          <p>The app adds the losing player's coins left as points. If Queen is covered, it adds 3 more points to the board winner.</p>
+        </div>
+        <div className="help-step">
+          <span className="help-num">6</span>
+          <h3>Sets and match</h3>
+          <p>A set ends when a player reaches {LIMIT_POINTS} points or after {LIMIT_BOARDS} boards. The higher score wins the set. First to 2 sets wins the match.</p>
+        </div>
+      </div>
+
+      <div className="help-note">
+        Use Undo if you enter a board wrongly. Reset Set removes only the current set's boards. Reset Match keeps names and colors but starts scoring again. Export JSON or CSV from the match screen when you need a saved copy.
+      </div>
+
+      <div className="modal-actions" style={{ marginTop: 22 }}>
+        <button className="btn primary" onClick={onClose}>Got it</button>
+      </div>
+    </Modal>
   );
 }
 
@@ -93,4 +146,4 @@ function TopBar({ onNew, onHome, driveSlot }) {
   );
 }
 
-Object.assign(window, { BrandMark, Coin, Avatar, Chip, SetPips, Confetti, Modal, TopBar });
+Object.assign(window, { BrandMark, Coin, Avatar, Chip, SetPips, Confetti, Modal, HelpModal, TopBar });

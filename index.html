@@ -231,15 +231,6 @@ input:focus, select:focus, button:focus-visible {
   letter-spacing: -0.01em;
 }
 .name-field input::placeholder { color: var(--muted-2); font-style: italic; }
-.name-field .coin-row { display: flex; gap: 8px; margin-top: 8px; }
-.coin-pick {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 6px 10px; border-radius: 999px;
-  border: 1px solid var(--line);
-  font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
-  color: var(--muted);
-}
-.coin-pick.active { color: var(--cream); border-color: var(--gold); background: rgba(200,166,90,0.1); }
 .coin-dot {
   width: 14px; height: 14px; border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, #fff, #e9dcbb 55%, var(--coin-white-line));
@@ -306,9 +297,6 @@ input:focus, select:focus, button:focus-visible {
   font-size: 28px; color: var(--cream); line-height: 1.05;
 }
 .choice-card .sub { color: var(--muted); font-size: 13px; margin-top: 4px; }
-
-.side-toggle { display: inline-flex; gap: 8px; margin-top: 10px; }
-.side-toggle .coin-pick { cursor: pointer; }
 
 /* ----------------------------- Scoreboard ------------------------------ */
 .score-grid {
@@ -591,6 +579,73 @@ input:focus, select:focus, button:focus-visible {
   font-family: 'JetBrains Mono', monospace; font-size: 20px; color: var(--muted); margin: 16px 0 24px;
 }
 .modal-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+
+.modal.help-modal {
+  width: min(760px, 94vw);
+  max-height: 88vh;
+  overflow: auto;
+  text-align: left;
+  padding: 34px;
+}
+.modal.help-modal h2 {
+  font-size: clamp(38px, 6vw, 58px);
+  text-align: left;
+}
+.help-intro {
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.55;
+  margin: 12px 0 18px;
+}
+.help-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.help-step {
+  position: relative;
+  background: rgba(255,241,205,0.04);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  padding: 16px 16px 15px 48px;
+}
+.help-num {
+  position: absolute;
+  left: 15px;
+  top: 16px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(180deg, var(--gold), var(--gold-2));
+  color: #1a1108;
+  font-size: 12px;
+  font-weight: 800;
+}
+.help-step h3 {
+  margin: 0 0 5px;
+  font-size: 15px;
+  color: var(--cream);
+}
+.help-step p,
+.help-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.help-note {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border-radius: var(--r-md);
+  border: 1px solid rgba(200,166,90,0.25);
+  background: rgba(200,166,90,0.08);
+}
+@media (max-width: 640px) {
+  .modal.help-modal { padding: 26px 20px; }
+  .help-grid { grid-template-columns: 1fr; }
+}
 
 /* ----------------------------- Confetti -------------------------------- */
 .confetti { position: fixed; inset: 0; pointer-events: none; z-index: 200; overflow: hidden; }
