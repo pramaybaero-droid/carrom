@@ -113,7 +113,7 @@ function Scoreboard({ match, onUpdate, onClose }) {
               {Math.min(match.boardNo, limitBoards)} / {limitBoards}
             </span>
           </div>
-          <div className="set-of" style={{ marginTop: 12 }}>{limitPoints} pts / Queen at {queenCutoff}+</div>
+          <div className="set-of" style={{ marginTop: 12 }}>{limitPoints} pts / Queen while <= {queenCutoff}</div>
           <div className="timer">{fmtTime(elapsed)}</div>
         </div>
 
@@ -154,7 +154,7 @@ function Scoreboard({ match, onUpdate, onClose }) {
               </button>
             </div>
             <div className="award-hint">
-              Enter how many of the <strong>losing</strong> player's coins remain. Queen +3 is ignored only when the board winner already has {queenCutoff}+ points before this board.
+              Enter how many of the <strong>losing</strong> player's coins remain. Queen +3 is ignored only when the board winner already has more than {queenCutoff} points before this board.
             </div>
           </div>
         </div>

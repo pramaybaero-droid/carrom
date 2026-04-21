@@ -75,7 +75,7 @@ function matchQueenCutoff(match) {
 
 function queenBonusCounts(match, playerKey) {
   const current = match?.[playerKey]?.setPts || 0;
-  return current < matchQueenCutoff(match);
+  return current <= matchQueenCutoff(match);
 }
 
 function defaultMatch({
