@@ -64,7 +64,10 @@ function popUndo(m) {
 
 function awardBoard(m, toKey, oppLeft, queen) {
   if (matchWinner(m)) return m;
-  const pts = Math.max(0, Math.min(9, oppLeft)) + (queen ? 3 : 0);
+  const coinsLeft = Math.max(0, Math.min(9, oppLeft));
+  const queenCounted = !!queen && queenBonusCounts(m, toKey, coinsLeft);
+  const queenIgnored = !!queen && !queenCounted;
+  const pts = coinsLeft + (queenCounted ? 3 : 0);
   let next = pushUndo(m);
   const winnerName = next[toKey].name;
   next = {
@@ -78,8 +81,11 @@ function awardBoard(m, toKey, oppLeft, queen) {
     board: next.boardNo,
     winner: toKey,
     winnerName,
-    oppLeft: Math.max(0, Math.min(9, oppLeft)),
-    queen,
+    oppLeft: coinsLeft,
+    queen: queenCounted,
+    queenRequested: !!queen,
+    queenIgnored,
+    queenCutoff: matchQueenCutoff(next),
     pts,
     setA: next.p1.setPts + (toKey === "p1" ? 0 : 0),
     setB: next.p2.setPts + (toKey === "p2" ? 0 : 0),
@@ -90,8 +96,8 @@ function awardBoard(m, toKey, oppLeft, queen) {
   next = { ...next, history: [...next.history, entry], boardNo: next.boardNo + 1 };
 
   // Check set end
-  const endedPts    = next.p1.setPts >= LIMIT_POINTS || next.p2.setPts >= LIMIT_POINTS;
-  const endedBoards = next.boardNo > LIMIT_BOARDS;
+  const endedPts    = next.p1.setPts >= matchLimitPoints(next) || next.p2.setPts >= matchLimitPoints(next);
+  const endedBoards = next.boardNo > matchLimitBoards(next);
   if (endedPts || endedBoards) {
     next = finalizeSet(next);
   }

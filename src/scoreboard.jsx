@@ -18,6 +18,11 @@ function Scoreboard({ match, onUpdate, onClose }) {
   const [setModal, setSetModal] = React.useState(null);
   const [matchModal, setMatchModal] = React.useState(false);
   const elapsed = useMatchTimer(match);
+  const limitPoints = matchLimitPoints(match);
+  const limitBoards = matchLimitBoards(match);
+  const queenCutoff = matchQueenCutoff(match);
+  const totalSetCount = safeTotalSets(match.totalSets);
+  const neededSets = Number(match.setsToWin) || setsNeeded(match);
 
   const mw = matchWinner(match);
 
@@ -68,8 +73,8 @@ function Scoreboard({ match, onUpdate, onClose }) {
   const p1Lead = match.p1.setPts > match.p2.setPts;
   const p2Lead = match.p2.setPts > match.p1.setPts;
 
-  // Set point flag (either is at 22+ and >= 3 ahead per typical rules, or either at 22+)
-  const setPoint = !mw && (match.p1.setPts >= 22 || match.p2.setPts >= 22);
+  // Set point flag follows the selected scoring format's queen cutoff.
+  const setPoint = !mw && (match.p1.setPts >= queenCutoff || match.p2.setPts >= queenCutoff);
 
   // Keyboard shortcuts
   React.useEffect(() => {
@@ -101,13 +106,14 @@ function Scoreboard({ match, onUpdate, onClose }) {
           )}
           <div className="set-of" style={{ marginTop: 14 }}>Set</div>
           <div className="big-set">{match.setNo}</div>
-          <div className="set-of">of {MAX_SETS}</div>
+          <div className="set-of">of {totalSetCount}</div>
           <div className="board-line">
             <span>Board</span>
             <span className="mono" style={{ color: "var(--cream)" }}>
-              {Math.min(match.boardNo, LIMIT_BOARDS)} / {LIMIT_BOARDS}
+              {Math.min(match.boardNo, limitBoards)} / {limitBoards}
             </span>
           </div>
+          <div className="set-of" style={{ marginTop: 12 }}>{limitPoints} pts / Queen at {queenCutoff}+</div>
           <div className="timer">{fmtTime(elapsed)}</div>
         </div>
 
@@ -135,7 +141,7 @@ function Scoreboard({ match, onUpdate, onClose }) {
                       className={`queen-toggle ${queen ? "on" : ""}`}
                       onClick={() => setQueen(q => !q)}>
                 <span className="queen-coin" />
-                {queen ? "Covered (+3)" : "Not covered"}
+                {queen ? "Covered (+3 if allowed)" : "Not covered"}
               </button>
             </div>
             <div />
@@ -148,7 +154,7 @@ function Scoreboard({ match, onUpdate, onClose }) {
               </button>
             </div>
             <div className="award-hint">
-              Enter how many of the <strong>losing</strong> player's coins remain. Tick Queen only if the winner covered it per AICF rules.
+              Enter how many of the <strong>losing</strong> player's coins remain. Queen +3 is ignored if it would take the board winner to {queenCutoff}+ points.
             </div>
           </div>
         </div>
@@ -194,7 +200,7 @@ function Scoreboard({ match, onUpdate, onClose }) {
         <div className="stinger crimson">Match Complete</div>
         <h2>🏆 <em>{mw ? match[mw].name : ""}</em> wins</h2>
         <div className="modal-score">
-          Sets {match.p1.setsWon} – {match.p2.setsWon} &nbsp;·&nbsp; {fmtTime(elapsed)}
+          Sets {match.p1.setsWon} – {match.p2.setsWon} &nbsp;·&nbsp; first to {neededSets} &nbsp;·&nbsp; {fmtTime(elapsed)}
         </div>
         <div className="modal-actions">
           <button className="btn primary" onClick={() => { doResetMatch(); setMatchModal(false); }}>
@@ -215,6 +221,10 @@ function PlayerCard({ player, playerKey, match, leading, winner, breakPlayer }) 
         <Avatar name={player.name} color={player.color} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="player-name">{player.name}</div>
+          {player.label && <div className="player-label eyebrow">{player.label}</div>}
+          {match.matchType === "doubles" && player.members?.length > 1 && (
+            <div className="member-list">{player.members.join(" + ")}</div>
+          )}
           <div className="player-meta">
             <span className="chip"><Coin color={player.color.toLowerCase()} size={10} /> {player.color}</span>
             {breakPlayer === playerKey && <span className="chip break">Breaks</span>}
@@ -230,7 +240,7 @@ function PlayerCard({ player, playerKey, match, leading, winner, breakPlayer }) 
         <div className="score-cell">
           <div className="eyebrow">Sets won</div>
           <div className="num small">{player.setsWon}</div>
-          <SetPips won={player.setsWon} />
+          <SetPips won={player.setsWon} max={Number(match.setsToWin) || setsNeeded(match)} />
         </div>
       </div>
     </div>
@@ -283,7 +293,7 @@ function HistoryPanel({ match }) {
                       <td>{h.board}</td>
                       <td><span className="winner-badge">{h.winnerName}</span></td>
                       <td className="mono">{h.oppLeft}</td>
-                      <td>{h.queen ? <span className="queen-badge">+3</span> : "—"}</td>
+                      <td>{h.queen ? <span className="queen-badge">+3</span> : h.queenIgnored ? <span className="queen-badge ignored">Ignored</span> : "—"}</td>
                       <td className="mono" style={{ fontWeight: 700 }}>{h.pts}</td>
                       <td className="score-cell-inline">{h.setA}</td>
                       <td className="score-cell-inline">{h.setB}</td>

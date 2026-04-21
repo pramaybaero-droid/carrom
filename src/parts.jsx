@@ -83,39 +83,44 @@ function HelpModal({ open, onClose }) {
       <div className="stinger">App Guide</div>
       <h2>How to use <em>Striker.</em></h2>
       <p className="help-intro">
-        Use this app to run a best-of-3 carrom match, track every board, move between sets automatically, and keep a match history.
+        Use this app to run singles or doubles carrom matches, choose 1 or 3 sets, track every board, move between sets automatically, and keep a match history.
       </p>
 
       <div className="help-grid">
         <div className="help-step">
           <span className="help-num">1</span>
-          <h3>Enter players</h3>
-          <p>Type both player names and tap Toss the Striker. Do not choose White or Black here. Coin color is decided after the toss.</p>
+          <h3>Choose competitors</h3>
+          <p>Select Singles for one name per side or Doubles for Team A and Team B with two names each. Coin color is decided after the toss.</p>
         </div>
         <div className="help-step">
           <span className="help-num">2</span>
+          <h3>Choose match rules</h3>
+          <p>Pick 1 set or 3 sets, then choose either 25 points / 8 boards or 15 points / 4 boards. A set ends when either limit is reached first.</p>
+        </div>
+        <div className="help-step">
+          <span className="help-num">3</span>
           <h3>Toss and break</h3>
           <p>Flip the striker. The toss winner chooses either Break first or Choose your side. Break first automatically means White coins.</p>
         </div>
         <div className="help-step">
-          <span className="help-num">3</span>
+          <span className="help-num">4</span>
           <h3>Choose side</h3>
           <p>If the toss winner chooses a side instead of breaking, they pick White or Black and the opponent breaks first.</p>
         </div>
         <div className="help-step">
-          <span className="help-num">4</span>
+          <span className="help-num">5</span>
           <h3>Enter points</h3>
           <p>After each board, enter how many coins the losing player has left, turn Queen on only if covered, then tap the board winner.</p>
         </div>
         <div className="help-step">
-          <span className="help-num">5</span>
+          <span className="help-num">6</span>
           <h3>Scoring rule</h3>
-          <p>The app adds the losing player's coins left as points. If Queen is covered, it adds 3 more points to the board winner.</p>
+          <p>The app adds the losing player's coins left as points. Queen +3 is ignored if it would take the winner to the cutoff: 22+ in 25-point games, 11+ in 15-point games.</p>
         </div>
         <div className="help-step">
-          <span className="help-num">6</span>
+          <span className="help-num">7</span>
           <h3>Sets and match</h3>
-          <p>A set ends when a player reaches {LIMIT_POINTS} points or after {LIMIT_BOARDS} boards. The higher score wins the set. First to 2 sets wins the match.</p>
+          <p>In a 1-set match, the first set winner wins the match. In a 3-set match, first to 2 sets wins the match.</p>
         </div>
       </div>
 

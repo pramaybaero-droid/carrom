@@ -2,9 +2,15 @@
 
 const LIMIT_POINTS = 25;
 const LIMIT_BOARDS = 8;
+const QUEEN_CUTOFF = 22;
 const MAX_SETS = 3;
 const STORAGE_KEY = "striker.matches.v1";
 const ACTIVE_KEY = "striker.active.v1";
+
+const SCORE_FORMATS = {
+  standard: { label: "25 points / 8 boards", limitPoints: 25, limitBoards: 8, queenCutoff: 22 },
+  quick:    { label: "15 points / 4 boards", limitPoints: 15, limitBoards: 4, queenCutoff: 11 },
+};
 
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -37,7 +43,66 @@ function fmtDate(ts) {
   });
 }
 
-function defaultMatch({ name1 = "Player One", name2 = "Player Two", color1 = "White", color2 = "Black" } = {}) {
+function cleanName(name, fallback) {
+  const n = String(name || "").trim();
+  return n || fallback;
+}
+
+function safeTotalSets(value) {
+  return Number(value) === 1 ? 1 : 3;
+}
+
+function setsNeeded(matchOrSets) {
+  const total = typeof matchOrSets === "number" ? safeTotalSets(matchOrSets) : safeTotalSets(matchOrSets?.totalSets);
+  return total === 1 ? 1 : 2;
+}
+
+function scoreRules(format) {
+  return SCORE_FORMATS[format] || SCORE_FORMATS.standard;
+}
+
+function matchLimitPoints(match) {
+  return Number(match?.limitPoints) || scoreRules(match?.scoreFormat).limitPoints;
+}
+
+function matchLimitBoards(match) {
+  return Number(match?.limitBoards) || scoreRules(match?.scoreFormat).limitBoards;
+}
+
+function matchQueenCutoff(match) {
+  return Number(match?.queenCutoff) || scoreRules(match?.scoreFormat).queenCutoff;
+}
+
+function queenBonusCounts(match, playerKey, coinsLeft = 0) {
+  const current = match?.[playerKey]?.setPts || 0;
+  const basePoints = Math.max(0, Math.min(9, Number(coinsLeft) || 0));
+  return current + basePoints + 3 < matchQueenCutoff(match);
+}
+
+function defaultMatch({
+  name1 = "Player One",
+  name2 = "Player Two",
+  teamA1 = "Team A Player 1",
+  teamA2 = "Team A Player 2",
+  teamB1 = "Team B Player 1",
+  teamB2 = "Team B Player 2",
+  matchType = "singles",
+  totalSets = MAX_SETS,
+  scoreFormat = "standard",
+  color1 = "White",
+  color2 = "Black",
+} = {}) {
+  const isDoubles = matchType === "doubles";
+  const normalizedScoreFormat = SCORE_FORMATS[scoreFormat] ? scoreFormat : "standard";
+  const rules = scoreRules(normalizedScoreFormat);
+  const setCount = safeTotalSets(totalSets);
+  const p1Members = isDoubles
+    ? [cleanName(teamA1, "Team A Player 1"), cleanName(teamA2, "Team A Player 2")]
+    : [cleanName(name1, "Player One")];
+  const p2Members = isDoubles
+    ? [cleanName(teamB1, "Team B Player 1"), cleanName(teamB2, "Team B Player 2")]
+    : [cleanName(name2, "Player Two")];
+
   return {
     id: uid(),
     createdAt: Date.now(),
@@ -48,10 +113,31 @@ function defaultMatch({ name1 = "Player One", name2 = "Player Two", color1 = "Wh
     tossWinner: null,         // "p1" | "p2"
     tossChoice: null,         // "break" | "side"
     breakPlayer: null,        // "p1" | "p2"
+    matchType: isDoubles ? "doubles" : "singles",
+    totalSets: setCount,
+    setsToWin: setsNeeded(setCount),
+    scoreFormat: normalizedScoreFormat,
+    limitPoints: rules.limitPoints,
+    limitBoards: rules.limitBoards,
+    queenCutoff: rules.queenCutoff,
     setNo: 1,
     boardNo: 1,
-    p1: { name: name1, color: color1, setPts: 0, setsWon: 0 },
-    p2: { name: name2, color: color2, setPts: 0, setsWon: 0 },
+    p1: {
+      label: isDoubles ? "Team A" : "Player One",
+      name: isDoubles ? p1Members.join(" / ") : p1Members[0],
+      members: p1Members,
+      color: color1,
+      setPts: 0,
+      setsWon: 0,
+    },
+    p2: {
+      label: isDoubles ? "Team B" : "Player Two",
+      name: isDoubles ? p2Members.join(" / ") : p2Members[0],
+      members: p2Members,
+      color: color2,
+      setPts: 0,
+      setsWon: 0,
+    },
     history: [],              // rows of board results (also set dividers)
     stack: [],                // undo snapshots
   };
@@ -59,8 +145,9 @@ function defaultMatch({ name1 = "Player One", name2 = "Player Two", color1 = "Wh
 
 function matchWinner(m) {
   if (!m) return null;
-  if (m.p1.setsWon >= 2) return "p1";
-  if (m.p2.setsWon >= 2) return "p2";
+  const needed = Number(m.setsToWin) || setsNeeded(m);
+  if (m.p1.setsWon >= needed) return "p1";
+  if (m.p2.setsWon >= needed) return "p2";
   return null;
 }
 
@@ -98,9 +185,9 @@ function exportJSON(match) {
 }
 
 function exportCSV(match) {
-  const rows = [["Set","Board","Winner","OppLeft","Queen+3","Pts","Set A","Set B","Time"]];
+  const rows = [["Set","Board","Winner","OppLeft","Queen","Pts","Set A","Set B","Time"]];
   (match.history || []).filter(h => h.kind === "board").forEach(h => {
-    rows.push([h.set, h.board, h.winnerName, h.oppLeft, h.queen ? "Yes" : "No",
+    rows.push([h.set, h.board, h.winnerName, h.oppLeft, h.queen ? "Counted +3" : h.queenIgnored ? "Ignored" : "No",
                h.pts, h.setA, h.setB, new Date(h.at).toISOString()]);
   });
   const csv = rows.map(r => r.map(v => {
@@ -131,8 +218,10 @@ function chord(freqs, dur = 0.25) {
 }
 
 Object.assign(window, {
-  LIMIT_POINTS, LIMIT_BOARDS, MAX_SETS, STORAGE_KEY, ACTIVE_KEY,
+  LIMIT_POINTS, LIMIT_BOARDS, QUEEN_CUTOFF, MAX_SETS, SCORE_FORMATS, STORAGE_KEY, ACTIVE_KEY,
   uid, initials, fmtTime, fmtDate,
+  cleanName, safeTotalSets, setsNeeded, scoreRules,
+  matchLimitPoints, matchLimitBoards, matchQueenCutoff, queenBonusCounts,
   defaultMatch, matchWinner,
   persistAll, loadAll, exportJSON, exportCSV,
   ping, chord,

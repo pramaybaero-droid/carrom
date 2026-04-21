@@ -162,9 +162,9 @@ async function uploadOrUpdate({ existingId, name, mimeType, content, parentId })
 }
 
 function matchToCSV(match) {
-  const rows = [["Set","Board","Winner","OppLeft","Queen+3","Pts","Set A","Set B","Time"]];
+  const rows = [["Set","Board","Winner","OppLeft","Queen","Pts","Set A","Set B","Time"]];
   (match.history || []).filter(h => h.kind === "board").forEach(h => {
-    rows.push([h.set, h.board, h.winnerName, h.oppLeft, h.queen ? "Yes" : "No",
+    rows.push([h.set, h.board, h.winnerName, h.oppLeft, h.queen ? "Counted +3" : h.queenIgnored ? "Ignored" : "No",
                h.pts, h.setA, h.setB, new Date(h.at).toISOString()]);
   });
   return rows.map(r => r.map(v => {
