@@ -1,5 +1,5 @@
 // Simple service worker: cache shell, network-first for APIs
-const CACHE = "striker-v7";
+const CACHE = "striker-v5";
 const SHELL = [
   "./",
   "./index.html",
