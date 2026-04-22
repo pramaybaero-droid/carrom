@@ -22,7 +22,7 @@ function Scoreboard({ match, onUpdate, onClose }) {
   const limitBoards = matchLimitBoards(match);
   const queenCutoff = matchQueenCutoff(match);
   const totalSetCount = safeTotalSets(match.totalSets);
-  const neededSets = Number(match.setsToWin) || setsNeeded(match);
+  const neededSets = matchSetsToWin(match);
 
   const mw = matchWinner(match);
 
@@ -113,7 +113,7 @@ function Scoreboard({ match, onUpdate, onClose }) {
               {Math.min(match.boardNo, limitBoards)} / {limitBoards}
             </span>
           </div>
-          <div className="set-of" style={{ marginTop: 12 }}>{limitPoints} pts / Queen at {queenCutoff}+</div>
+          <div className="set-of" style={{ marginTop: 12 }}>{limitPoints} pts / Queen while <= {queenCutoff}</div>
           <div className="timer">{fmtTime(elapsed)}</div>
         </div>
 
@@ -154,7 +154,7 @@ function Scoreboard({ match, onUpdate, onClose }) {
               </button>
             </div>
             <div className="award-hint">
-              Enter how many of the <strong>losing</strong> player's coins remain. Queen +3 is ignored only when the board winner already has {queenCutoff}+ points before this board.
+              Enter how many of the <strong>losing</strong> player's coins remain. Queen +3 is ignored only when the board winner already has more than {queenCutoff} points before this board.
             </div>
           </div>
         </div>
@@ -215,18 +215,26 @@ function Scoreboard({ match, onUpdate, onClose }) {
 
 function PlayerCard({ player, playerKey, match, leading, winner, breakPlayer }) {
   const cls = `player-card ${leading ? "leading" : ""} ${winner ? "winner-match" : ""}`;
+  const displayName = cleanName(player && player.name, playerKey === "p1" ? "Player One" : "Player Two");
+  const displayLabel = player && player.label ? player.label : "";
+  const color = cleanName(player && player.color, playerKey === "p1" ? "White" : "Black");
+  const members = player && Array.isArray(player.members)
+    ? player.members.map(n => cleanName(n, "")).filter(Boolean)
+    : [];
+  const setPts = Number(player && player.setPts) || 0;
+  const setsWon = Number(player && player.setsWon) || 0;
   return (
     <div className={cls}>
       <div className="player-head">
-        <Avatar name={player.name} color={player.color} />
+        <Avatar name={displayName} color={color} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="player-name">{player.name}</div>
-          {player.label && <div className="player-label eyebrow">{player.label}</div>}
-          {match.matchType === "doubles" && player.members?.length > 1 && (
-            <div className="member-list">{player.members.join(" + ")}</div>
+          <div className="player-name">{displayName}</div>
+          {displayLabel && <div className="player-label eyebrow">{displayLabel}</div>}
+          {match.matchType === "doubles" && members.length > 1 && (
+            <div className="member-list">{members.join(" + ")}</div>
           )}
           <div className="player-meta">
-            <span className="chip"><Coin color={player.color.toLowerCase()} size={10} /> {player.color}</span>
+            <span className="chip"><Coin color={color.toLowerCase()} size={10} /> {color}</span>
             {breakPlayer === playerKey && <span className="chip break">Breaks</span>}
           </div>
         </div>
@@ -235,12 +243,12 @@ function PlayerCard({ player, playerKey, match, leading, winner, breakPlayer }) 
       <div className="score-rows">
         <div className="score-cell">
           <div className="eyebrow">Set points</div>
-          <div className="num">{player.setPts}</div>
+          <div className="num">{setPts}</div>
         </div>
         <div className="score-cell">
           <div className="eyebrow">Sets won</div>
-          <div className="num small">{player.setsWon}</div>
-          <SetPips won={player.setsWon} max={Number(match.setsToWin) || setsNeeded(match)} />
+          <div className="num small">{setsWon}</div>
+          <SetPips won={setsWon} max={matchSetsToWin(match)} />
         </div>
       </div>
     </div>

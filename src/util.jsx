@@ -48,6 +48,24 @@ function cleanName(name, fallback) {
   return n || fallback;
 }
 
+function normalizeCompetitorForLive(player, fallbackLabel, fallbackColor) {
+  const source = player || {};
+  const members = Array.isArray(source.members)
+    ? source.members.map(n => cleanName(n, "")).filter(Boolean)
+    : [];
+  const fallbackName = members.length ? members.join(" / ") : fallbackLabel;
+  const name = cleanName(source.name, fallbackName);
+  return {
+    ...source,
+    label: cleanName(source.label, fallbackLabel),
+    name,
+    members: members.length ? members : [name],
+    color: cleanName(source.color, fallbackColor),
+    setPts: Number(source.setPts) || 0,
+    setsWon: Number(source.setsWon) || 0,
+  };
+}
+
 function safeTotalSets(value) {
   return Number(value) === 1 ? 1 : 3;
 }
@@ -55,6 +73,13 @@ function safeTotalSets(value) {
 function setsNeeded(matchOrSets) {
   const total = typeof matchOrSets === "number" ? safeTotalSets(matchOrSets) : safeTotalSets(matchOrSets?.totalSets);
   return total === 1 ? 1 : 2;
+}
+
+function matchSetsToWin(match) {
+  const total = Number(match?.totalSets);
+  if (total === 1) return 1;
+  if (total === 3) return 2;
+  return Number(match?.setsToWin) === 1 ? 1 : 2;
 }
 
 function scoreRules(format) {
@@ -75,7 +100,7 @@ function matchQueenCutoff(match) {
 
 function queenBonusCounts(match, playerKey) {
   const current = match?.[playerKey]?.setPts || 0;
-  return current < matchQueenCutoff(match);
+  return current <= matchQueenCutoff(match);
 }
 
 function defaultMatch({
@@ -144,7 +169,7 @@ function defaultMatch({
 
 function matchWinner(m) {
   if (!m) return null;
-  const needed = Number(m.setsToWin) || setsNeeded(m);
+  const needed = matchSetsToWin(m);
   if (m.p1.setsWon >= needed) return "p1";
   if (m.p2.setsWon >= needed) return "p2";
   return null;
@@ -219,7 +244,7 @@ function chord(freqs, dur = 0.25) {
 Object.assign(window, {
   LIMIT_POINTS, LIMIT_BOARDS, QUEEN_CUTOFF, MAX_SETS, SCORE_FORMATS, STORAGE_KEY, ACTIVE_KEY,
   uid, initials, fmtTime, fmtDate,
-  cleanName, safeTotalSets, setsNeeded, scoreRules,
+  cleanName, normalizeCompetitorForLive, safeTotalSets, setsNeeded, matchSetsToWin, scoreRules,
   matchLimitPoints, matchLimitBoards, matchQueenCutoff, queenBonusCounts,
   defaultMatch, matchWinner,
   persistAll, loadAll, exportJSON, exportCSV,
