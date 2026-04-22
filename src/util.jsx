@@ -48,6 +48,24 @@ function cleanName(name, fallback) {
   return n || fallback;
 }
 
+function normalizeCompetitorForLive(player, fallbackLabel, fallbackColor) {
+  const source = player || {};
+  const members = Array.isArray(source.members)
+    ? source.members.map(n => cleanName(n, "")).filter(Boolean)
+    : [];
+  const fallbackName = members.length ? members.join(" / ") : fallbackLabel;
+  const name = cleanName(source.name, fallbackName);
+  return {
+    ...source,
+    label: cleanName(source.label, fallbackLabel),
+    name,
+    members: members.length ? members : [name],
+    color: cleanName(source.color, fallbackColor),
+    setPts: Number(source.setPts) || 0,
+    setsWon: Number(source.setsWon) || 0,
+  };
+}
+
 function safeTotalSets(value) {
   return Number(value) === 1 ? 1 : 3;
 }
@@ -219,7 +237,7 @@ function chord(freqs, dur = 0.25) {
 Object.assign(window, {
   LIMIT_POINTS, LIMIT_BOARDS, QUEEN_CUTOFF, MAX_SETS, SCORE_FORMATS, STORAGE_KEY, ACTIVE_KEY,
   uid, initials, fmtTime, fmtDate,
-  cleanName, safeTotalSets, setsNeeded, scoreRules,
+  cleanName, normalizeCompetitorForLive, safeTotalSets, setsNeeded, scoreRules,
   matchLimitPoints, matchLimitBoards, matchQueenCutoff, queenBonusCounts,
   defaultMatch, matchWinner,
   persistAll, loadAll, exportJSON, exportCSV,

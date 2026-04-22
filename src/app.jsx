@@ -85,10 +85,14 @@ function App() {
   const onTossDone = (res) => {
     if (!active) return;
     updateMatch(active.id, m => ({
-      ...m, phase: "live", startedAt: Date.now(),
-      tossWinner: res.tossWinner, tossChoice: res.tossChoice, breakPlayer: res.breakPlayer,
-      p1: { ...m.p1, color: res.p1Color || m.p1.color },
-      p2: { ...m.p2, color: res.p2Color || m.p2.color },
+      ...m,
+      phase: "live",
+      startedAt: Date.now(),
+      tossWinner: res.tossWinner,
+      tossChoice: res.tossChoice,
+      breakPlayer: res.breakPlayer,
+      p1: normalizeCompetitorForLive({ ...m.p1, color: res.p1Color || m.p1.color }, m.matchType === "doubles" ? "Team A" : "Player One", "White"),
+      p2: normalizeCompetitorForLive({ ...m.p2, color: res.p2Color || m.p2.color }, m.matchType === "doubles" ? "Team B" : "Player Two", "Black"),
     }));
   };
 
