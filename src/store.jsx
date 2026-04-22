@@ -32,8 +32,7 @@ function useStore() {
       ...s,
       matches: s.matches.map(m => {
         if (m.id !== id) return m;
-        const next = normalizeMatch(typeof updater === "function" ? updater(m) : { ...m, ...updater });
-        if (!next) return m;
+        const next = typeof updater === "function" ? updater(m) : { ...m, ...updater };
         next.updatedAt = Date.now();
         return next;
       })

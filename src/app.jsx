@@ -83,23 +83,13 @@ function App() {
     updateMatch(id, m => ({ ...m, phase: "toss" }));
   };
   const onTossDone = (res) => {
-    const id = res.matchId || active?.id || state.activeId;
-    if (!id) return;
-    updateMatch(id, m => {
-      const p1 = m.p1 || {};
-      const p2 = m.p2 || {};
-      const isDoubles = m.matchType === "doubles";
-      return {
-        ...m,
-        phase: "live",
-        startedAt: Date.now(),
-        tossWinner: res.tossWinner,
-        tossChoice: res.tossChoice,
-        breakPlayer: res.breakPlayer,
-        p1: normalizeCompetitorForLive({ ...p1, color: res.p1Color || p1.color }, isDoubles ? "Team A" : "Player One", "White"),
-        p2: normalizeCompetitorForLive({ ...p2, color: res.p2Color || p2.color }, isDoubles ? "Team B" : "Player Two", "Black"),
-      };
-    });
+    if (!active) return;
+    updateMatch(active.id, m => ({
+      ...m, phase: "live", startedAt: Date.now(),
+      tossWinner: res.tossWinner, tossChoice: res.tossChoice, breakPlayer: res.breakPlayer,
+      p1: { ...m.p1, color: res.p1Color || m.p1.color },
+      p2: { ...m.p2, color: res.p2Color || m.p2.color },
+    }));
   };
 
   const openFromCloud = async (row) => {
@@ -194,8 +184,4 @@ function App() {
 }
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(
-  <ErrorBoundary>
-    <App />
-  </ErrorBoundary>
-);
+root.render(<App />);

@@ -77,38 +77,6 @@ function Modal({ open, onClose, children, className = "" }) {
   );
 }
 
-class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { error: null };
-  }
-  static getDerivedStateFromError(error) {
-    return { error };
-  }
-  render() {
-    if (!this.state.error) return this.props.children;
-    return (
-      <div className="shell">
-        <div className="panel" style={{ textAlign: "center", maxWidth: 680, margin: "40px auto" }}>
-          <h3>App could not open</h3>
-          <p className="tip" style={{ margin: "12px 0 18px" }}>
-            A saved match on this device may be damaged. Start a fresh local session if reloading does not fix it.
-          </p>
-          <div className="modal-actions">
-            <button className="btn ghost" onClick={() => location.reload()}>Reload</button>
-            <button className="btn primary" onClick={() => {
-              if (!confirm("Clear local matches on this device? Cloud leaderboard data stays.")) return;
-              localStorage.removeItem(STORAGE_KEY);
-              localStorage.removeItem(ACTIVE_KEY);
-              location.reload();
-            }}>Start Fresh</button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-}
-
 function HelpModal({ open, onClose }) {
   return (
     <Modal open={open} onClose={onClose} className="help-modal">
@@ -183,4 +151,4 @@ function TopBar({ onNew, onHome, driveSlot }) {
   );
 }
 
-Object.assign(window, { BrandMark, Coin, Avatar, Chip, SetPips, Confetti, Modal, ErrorBoundary, HelpModal, TopBar });
+Object.assign(window, { BrandMark, Coin, Avatar, Chip, SetPips, Confetti, Modal, HelpModal, TopBar });

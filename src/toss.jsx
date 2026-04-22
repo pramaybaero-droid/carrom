@@ -5,8 +5,6 @@ function Toss({ match, onDone }) {
   const [winner, setWinner] = React.useState(null); // "p1" | "p2"
 
   const p1 = match.p1, p2 = match.p2;
-  const winnerPlayer = winner ? match[winner] : null;
-  const winnerName = winnerPlayer ? winnerPlayer.name : "";
 
   const spin = () => {
     setPhase("spinning");
@@ -22,18 +20,16 @@ function Toss({ match, onDone }) {
   };
 
   const chooseBreak = (who) => {
-    if (!winner) return;
     // Winner chose to break -> they break AND get White coins automatically.
     const newP1Color = winner === "p1" ? "White" : "Black";
     const newP2Color = winner === "p2" ? "White" : "Black";
     onDone({
-      matchId: match.id, tossWinner: winner, tossChoice: "break", breakPlayer: winner,
+      tossWinner: winner, tossChoice: "break", breakPlayer: winner,
       p1Color: newP1Color, p2Color: newP2Color,
     });
   };
-  const chooseSide = () => { if (winner) setPhase("choosing"); };
+  const chooseSide = () => setPhase("choosing");
   const confirmSide = (chosenColor) => {
-    if (!winner) return;
     // Winner picks a side/color; opponent breaks.
     const other = winner === "p1" ? "p2" : "p1";
     // Swap colors so winner has the chosen color
@@ -41,7 +37,7 @@ function Toss({ match, onDone }) {
     if (winner === "p1" && match.p1.color !== chosenColor) { newP1Color = chosenColor; newP2Color = chosenColor === "White" ? "Black" : "White"; }
     if (winner === "p2" && match.p2.color !== chosenColor) { newP2Color = chosenColor; newP1Color = chosenColor === "White" ? "Black" : "White"; }
     onDone({
-      matchId: match.id, tossWinner: winner, tossChoice: "side", breakPlayer: other,
+      tossWinner: winner, tossChoice: "side", breakPlayer: other,
       p1Color: newP1Color, p2Color: newP2Color,
     });
   };
@@ -53,8 +49,8 @@ function Toss({ match, onDone }) {
         <h1 style={{ fontSize: "clamp(36px, 6vw, 72px)" }}>
           {phase === "idle" && <>Spin the <em>striker.</em></>}
           {phase === "spinning" && <>Spinning…</>}
-          {phase === "winner" && <>The toss goes to <em>{winnerName}.</em></>}
-          {phase === "choosing" && <><em>{winnerName}</em> picks a side.</>}
+          {phase === "winner" && <>The toss goes to <em>{match[winner].name}.</em></>}
+          {phase === "choosing" && <><em>{match[winner].name}</em> picks a side.</>}
         </h1>
 
         <div className="toss-stage">
@@ -75,7 +71,7 @@ function Toss({ match, onDone }) {
           {phase === "winner" && (
             <>
               <div className="toss-result">
-                Choose, <em>{winnerName}</em>.
+                Choose, <em>{match[winner].name}</em>.
               </div>
               <div className="toss-choice">
                 <button type="button" className="choice-card" onClick={chooseBreak}>
