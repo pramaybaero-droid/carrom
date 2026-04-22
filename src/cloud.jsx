@@ -11,7 +11,7 @@ function getSupabase() {
   if (_sbReady) return _sbReady;
   _sbReady = new Promise((resolve, reject) => {
     const s = document.createElement("script");
-    s.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js";
+    s.src = "vendor/supabase.min.js";
     s.onload = () => {
       const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
       resolve(client);
