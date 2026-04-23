@@ -48,24 +48,6 @@ function cleanName(name, fallback) {
   return n || fallback;
 }
 
-function normalizeCompetitorForLive(player, fallbackLabel, fallbackColor) {
-  const source = player || {};
-  const members = Array.isArray(source.members)
-    ? source.members.map(n => cleanName(n, "")).filter(Boolean)
-    : [];
-  const fallbackName = members.length ? members.join(" / ") : fallbackLabel;
-  const name = cleanName(source.name, fallbackName);
-  return {
-    ...source,
-    label: cleanName(source.label, fallbackLabel),
-    name,
-    members: members.length ? members : [name],
-    color: cleanName(source.color, fallbackColor),
-    setPts: Number(source.setPts) || 0,
-    setsWon: Number(source.setsWon) || 0,
-  };
-}
-
 function safeTotalSets(value) {
   return Number(value) === 1 ? 1 : 3;
 }
@@ -73,13 +55,6 @@ function safeTotalSets(value) {
 function setsNeeded(matchOrSets) {
   const total = typeof matchOrSets === "number" ? safeTotalSets(matchOrSets) : safeTotalSets(matchOrSets?.totalSets);
   return total === 1 ? 1 : 2;
-}
-
-function matchSetsToWin(match) {
-  const total = Number(match?.totalSets);
-  if (total === 1) return 1;
-  if (total === 3) return 2;
-  return Number(match?.setsToWin) === 1 ? 1 : 2;
 }
 
 function scoreRules(format) {
@@ -100,7 +75,7 @@ function matchQueenCutoff(match) {
 
 function queenBonusCounts(match, playerKey) {
   const current = match?.[playerKey]?.setPts || 0;
-  return current <= matchQueenCutoff(match);
+  return current < matchQueenCutoff(match);
 }
 
 function defaultMatch({
@@ -115,6 +90,8 @@ function defaultMatch({
   scoreFormat = "standard",
   color1 = "White",
   color2 = "Black",
+  ownerId = null,
+  ownerName = "",
 } = {}) {
   const isDoubles = matchType === "doubles";
   const normalizedScoreFormat = SCORE_FORMATS[scoreFormat] ? scoreFormat : "standard";
@@ -131,6 +108,8 @@ function defaultMatch({
     id: uid(),
     createdAt: Date.now(),
     updatedAt: Date.now(),
+    ownerId: ownerId,            // player id of the user who started this match
+    ownerName: ownerName || "",  // display name at the time the match was started
     phase: "setup",           // setup -> toss -> live -> over
     startedAt: null,
     endedAt: null,
@@ -167,53 +146,11 @@ function defaultMatch({
   };
 }
 
-function normalizeMatch(raw) {
-  if (!raw || typeof raw !== "object") return null;
-
-  const scoreFormat = SCORE_FORMATS[raw.scoreFormat]
-    ? raw.scoreFormat
-    : (Number(raw.limitPoints) === 15 || Number(raw.limitBoards) === 4 ? "quick" : "standard");
-  const rules = scoreRules(scoreFormat);
-  const totalSets = Number(raw.totalSets) === 1 ? 1 : Number(raw.totalSets) === 3 ? 3 : Number(raw.setsToWin) === 1 ? 1 : 3;
-  const isDoubles = raw.matchType === "doubles" ||
-    (Array.isArray(raw.p1?.members) && raw.p1.members.length > 1) ||
-    (Array.isArray(raw.p2?.members) && raw.p2.members.length > 1);
-  const phase = ["setup", "toss", "live", "over"].includes(raw.phase) ? raw.phase : "setup";
-  const p1 = normalizeCompetitorForLive(raw.p1, isDoubles ? "Team A" : "Player One", "White");
-  const p2 = normalizeCompetitorForLive(raw.p2, isDoubles ? "Team B" : "Player Two", "Black");
-
-  return {
-    ...raw,
-    id: cleanName(raw.id, uid()),
-    createdAt: Number(raw.createdAt) || Date.now(),
-    updatedAt: Number(raw.updatedAt) || Date.now(),
-    phase,
-    startedAt: raw.startedAt || null,
-    endedAt: raw.endedAt || null,
-    tossWinner: raw.tossWinner === "p1" || raw.tossWinner === "p2" ? raw.tossWinner : null,
-    tossChoice: raw.tossChoice === "break" || raw.tossChoice === "side" ? raw.tossChoice : null,
-    breakPlayer: raw.breakPlayer === "p1" || raw.breakPlayer === "p2" ? raw.breakPlayer : null,
-    matchType: isDoubles ? "doubles" : "singles",
-    totalSets,
-    setsToWin: matchSetsToWin({ totalSets }),
-    scoreFormat,
-    limitPoints: Number(raw.limitPoints) || rules.limitPoints,
-    limitBoards: Number(raw.limitBoards) || rules.limitBoards,
-    queenCutoff: Number(raw.queenCutoff) || rules.queenCutoff,
-    setNo: Math.max(1, Number(raw.setNo) || 1),
-    boardNo: Math.max(1, Number(raw.boardNo) || 1),
-    p1,
-    p2,
-    history: Array.isArray(raw.history) ? raw.history : [],
-    stack: Array.isArray(raw.stack) ? raw.stack : [],
-  };
-}
-
 function matchWinner(m) {
   if (!m) return null;
-  const needed = matchSetsToWin(m);
-  if ((m.p1?.setsWon || 0) >= needed) return "p1";
-  if ((m.p2?.setsWon || 0) >= needed) return "p2";
+  const needed = Number(m.setsToWin) || setsNeeded(m);
+  if (m.p1.setsWon >= needed) return "p1";
+  if (m.p2.setsWon >= needed) return "p2";
   return null;
 }
 
@@ -222,7 +159,6 @@ function persistAll(matches, activeId) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(matches));
     if (activeId) localStorage.setItem(ACTIVE_KEY, activeId);
-    else localStorage.removeItem(ACTIVE_KEY);
   } catch (e) { console.warn("Persist error:", e); }
 }
 
@@ -230,10 +166,7 @@ function loadAll() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     const active = localStorage.getItem(ACTIVE_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    const matches = (Array.isArray(parsed) ? parsed : []).map(normalizeMatch).filter(Boolean);
-    const activeId = matches.some(m => m.id === active) ? active : (matches[matches.length - 1]?.id || null);
-    return { matches, activeId };
+    return { matches: raw ? JSON.parse(raw) : [], activeId: active };
   } catch (e) {
     return { matches: [], activeId: null };
   }
@@ -290,7 +223,7 @@ function chord(freqs, dur = 0.25) {
 Object.assign(window, {
   LIMIT_POINTS, LIMIT_BOARDS, QUEEN_CUTOFF, MAX_SETS, SCORE_FORMATS, STORAGE_KEY, ACTIVE_KEY,
   uid, initials, fmtTime, fmtDate,
-  cleanName, normalizeCompetitorForLive, normalizeMatch, safeTotalSets, setsNeeded, matchSetsToWin, scoreRules,
+  cleanName, safeTotalSets, setsNeeded, scoreRules,
   matchLimitPoints, matchLimitBoards, matchQueenCutoff, queenBonusCounts,
   defaultMatch, matchWinner,
   persistAll, loadAll, exportJSON, exportCSV,

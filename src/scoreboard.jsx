@@ -1,4 +1,10 @@
 // Scoreboard + Award panel + History + Match timer
+// Edit access rules:
+//   - If the signed-in user started the match (session.id === match.ownerId) → full control.
+//   - If admin is unlocked this session → full control PLUS extra admin-only buttons
+//     (rollback last set, skip to next set, re-open finished match).
+//   - Everyone else → read-only. Award, undo, reset, swap are all hidden.
+//     A read-only banner shows who is running this match.
 
 function useMatchTimer(match) {
   const [now, setNow] = React.useState(Date.now());
@@ -11,46 +17,59 @@ function useMatchTimer(match) {
   return elapsed;
 }
 
-function Scoreboard({ match, onUpdate, onClose }) {
-  const [oppLeft, setOppLeft] = React.useState(0);
-  const [queen, setQueen] = React.useState(false);
+function Scoreboard({ match, onUpdate, onClose, session, isAdmin }) {
+  const [oppLeft, setOppLeft]         = React.useState(0);
+  const [queen, setQueen]             = React.useState(false);
   const [confettiKey, setConfettiKey] = React.useState(0);
-  const [setModal, setSetModal] = React.useState(null);
-  const [matchModal, setMatchModal] = React.useState(false);
-  const elapsed = useMatchTimer(match);
-  const limitPoints = matchLimitPoints(match);
-  const limitBoards = matchLimitBoards(match);
-  const queenCutoff = matchQueenCutoff(match);
+  const [setModal, setSetModal]       = React.useState(null);
+  const [matchModal, setMatchModal]   = React.useState(false);
+
+  const elapsed      = useMatchTimer(match);
+  const limitPoints  = matchLimitPoints(match);
+  const limitBoards  = matchLimitBoards(match);
+  const queenCutoff  = matchQueenCutoff(match);
   const totalSetCount = safeTotalSets(match.totalSets);
-  const neededSets = matchSetsToWin(match);
+  const neededSets   = Number(match.setsToWin) || setsNeeded(match);
 
   const mw = matchWinner(match);
 
-  // Detect new set-end rows to trigger modals/confetti (only once per id)
+  // -------- Access control --------
+  // Legacy matches from before this update have no ownerId → treat as editable
+  // by anyone (can't retroactively lock down data that has no owner recorded).
+  const isLegacy  = !match.ownerId;
+  const isOwner   = !!match.ownerId && match.ownerId === session?.id;
+  const canEdit   = isLegacy || isOwner || isAdmin;
+  const canEditBy = isOwner ? "owner" : isAdmin ? "admin" : isLegacy ? "legacy" : "none";
+
+  // Modals / sound effects — only fire for the user actively playing the match,
+  // so spectators aren't interrupted.
   const lastHistoryIdRef = React.useRef(match.history.length);
   React.useEffect(() => {
     const len = match.history.length;
     if (len > lastHistoryIdRef.current) {
-      const lastNew = match.history.slice(lastHistoryIdRef.current).reverse()
-        .find(h => h.kind === "set-end");
-      if (lastNew) {
-        chord([523, 659, 784, 1047], 0.3);
-        setConfettiKey(k => k + 1);
-        if (matchWinner(match)) setMatchModal(true);
-        else setSetModal(lastNew);
+      if (canEdit) {
+        const lastNew = match.history.slice(lastHistoryIdRef.current).reverse()
+          .find(h => h.kind === "set-end");
+        if (lastNew) {
+          chord([523, 659, 784, 1047], 0.3);
+          setConfettiKey(k => k + 1);
+          if (matchWinner(match)) setMatchModal(true);
+          else setSetModal(lastNew);
+        }
       }
     }
     lastHistoryIdRef.current = len;
-  }, [match.history.length]);
+  }, [match.history.length, canEdit]);
 
   const award = (to) => {
-    if (mw) return;
+    if (!canEdit || mw) return;
     onUpdate(m => awardBoard(m, to, oppLeft, queen));
     setOppLeft(0); setQueen(false);
     ping(720, 0.08, "triangle", 0.05);
   };
 
   const doUndo = () => {
+    if (!canEdit) return;
     const next = popUndo(match);
     if (!next) return;
     onUpdate(() => next);
@@ -58,44 +77,84 @@ function Scoreboard({ match, onUpdate, onClose }) {
   };
 
   const doResetSet = () => {
+    if (!canEdit) return;
     if (!confirm(`Reset current Set ${match.setNo}? This removes this set's boards.`)) return;
     onUpdate(m => resetSet(m));
   };
   const doResetMatch = () => {
+    if (!canEdit) return;
     if (!confirm("Reset the entire match? Names & colors kept.")) return;
     onUpdate(m => resetMatch(m));
   };
   const doSwap = () => {
+    if (!canEdit) return;
     onUpdate(m => swapPlayers(m));
+  };
+
+  // Admin-only controls
+  const doRollbackLastSet = () => {
+    if (!isAdmin) return;
+    const hasFinalizedSet = (match.history || []).some(h => h.kind === "set-end");
+    if (!hasFinalizedSet) { alert("No completed set to roll back."); return; }
+    if (!confirm("Admin: roll back the most recently completed set? Scores and sets-won will be restored to mid-set.")) return;
+    onUpdate(m => rollbackLastSet(m));
+  };
+  const doSkipSet = () => {
+    if (!isAdmin) return;
+    if (!confirm(`Admin: force-end Set ${match.setNo} right now? Whoever is ahead takes the set.`)) return;
+    onUpdate(m => skipToNextSet(m));
+  };
+  const doReopenMatch = () => {
+    if (!isAdmin) return;
+    if (match.phase !== "over") return;
+    if (!confirm("Admin: re-open this finished match so scores can be edited?")) return;
+    onUpdate(m => reopenMatch(m));
   };
 
   // Leader logic
   const p1Lead = match.p1.setPts > match.p2.setPts;
   const p2Lead = match.p2.setPts > match.p1.setPts;
 
-  // Set point flag follows the selected scoring format's queen cutoff.
   const setPoint = !mw && (match.p1.setPts >= queenCutoff || match.p2.setPts >= queenCutoff);
 
   // Keyboard shortcuts
   React.useEffect(() => {
     const onKey = (e) => {
       if (e.target.tagName === "INPUT") return;
+      if (!canEdit) return;
       if ((e.ctrlKey || e.metaKey) && (e.key === "z" || e.key === "Z")) { e.preventDefault(); doUndo(); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [match]);
+  }, [match, canEdit]);
 
   return (
     <div className="shell">
       <Confetti trigger={confettiKey} />
 
+      {/* Access banner */}
+      {!canEdit && (
+        <div className="banner" style={{ marginBottom: 16, marginTop: 0 }}>
+          <span style={{ color: "var(--gold)" }}>👁</span>
+          <div>
+            <strong>Read-only</strong> — this match is being run by{" "}
+            <strong>{match.ownerName || "another player"}</strong>. You can watch scores update live but can't change them. Scores from the cloud refresh automatically.
+          </div>
+        </div>
+      )}
+      {canEdit && canEditBy === "admin" && !isOwner && (
+        <div className="banner" style={{ marginBottom: 16, marginTop: 0, borderColor: "var(--queen-2)", background: "rgba(201,52,76,0.08)" }}>
+          <span style={{ color: "var(--queen)" }}>★</span>
+          <div>
+            <strong>Admin mode</strong> — you are editing {match.ownerName ? <><strong>{match.ownerName}</strong>'s</> : "a"} match. All changes overwrite the cloud record.
+          </div>
+        </div>
+      )}
+
       <div className="score-grid">
-        {/* Player 1 */}
         <PlayerCard player={match.p1} playerKey="p1" match={match}
                     leading={p1Lead} winner={mw === "p1"} breakPlayer={match.breakPlayer} />
 
-        {/* Center */}
         <div className="center-card">
           {mw ? (
             <span className="status-tag match-over">Match Won</span>
@@ -113,17 +172,16 @@ function Scoreboard({ match, onUpdate, onClose }) {
               {Math.min(match.boardNo, limitBoards)} / {limitBoards}
             </span>
           </div>
-          <div className="set-of" style={{ marginTop: 12 }}>{limitPoints} pts / Queen while {"<="} {queenCutoff}</div>
+          <div className="set-of" style={{ marginTop: 12 }}>{limitPoints} pts / Queen at {queenCutoff}+</div>
           <div className="timer">{fmtTime(elapsed)}</div>
         </div>
 
-        {/* Player 2 */}
         <PlayerCard player={match.p2} playerKey="p2" match={match}
                     leading={p2Lead} winner={mw === "p2"} breakPlayer={match.breakPlayer} />
       </div>
 
-      {/* Award panel */}
-      {!mw && (
+      {/* Award panel — only for editors, only while match is in progress */}
+      {canEdit && !mw && (
         <div className="award">
           <h3>Award the current board</h3>
           <div className="award-row">
@@ -154,25 +212,42 @@ function Scoreboard({ match, onUpdate, onClose }) {
               </button>
             </div>
             <div className="award-hint">
-              Enter how many of the <strong>losing</strong> player's coins remain. Queen +3 is ignored only when the board winner already has more than {queenCutoff} points before this board.
+              Enter how many of the <strong>losing</strong> player's coins remain. Queen +3 is ignored only when the board winner already has {queenCutoff}+ points before this board.
             </div>
           </div>
         </div>
       )}
 
-      {/* Admin bar */}
+      {/* Control bar */}
       <div className="panel" style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-        <button className="btn ghost sm" onClick={doUndo} disabled={!match.stack?.length}>↶ Undo</button>
-        <button className="btn ghost sm" onClick={doResetSet}>Reset Set</button>
-        <button className="btn ghost sm" onClick={doResetMatch}>Reset Match</button>
-        <button className="btn ghost sm" onClick={doSwap}>Swap Players</button>
+        {canEdit && (
+          <>
+            <button className="btn ghost sm" onClick={doUndo} disabled={!match.stack?.length}>↶ Undo</button>
+            <button className="btn ghost sm" onClick={doResetSet}>Reset Set</button>
+            <button className="btn ghost sm" onClick={doResetMatch}>Reset Match</button>
+            <button className="btn ghost sm" onClick={doSwap}>Swap Players</button>
+          </>
+        )}
         <div className="spacer" />
         <button className="btn ghost sm" onClick={() => exportJSON(match)}>Export JSON</button>
         <button className="btn ghost sm" onClick={() => exportCSV(match)}>Export CSV</button>
         <button className="btn ghost sm" onClick={onClose}>Close Match</button>
       </div>
 
-      {/* History */}
+      {/* Admin-only controls */}
+      {isAdmin && (
+        <div className="panel" style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", borderColor: "var(--queen-2)", background: "rgba(201,52,76,0.04)" }}>
+          <span className="eyebrow" style={{ color: "var(--queen)", marginRight: 6 }}>Admin</span>
+          <button className="btn ghost sm" onClick={doRollbackLastSet}>← Rollback last set</button>
+          <button className="btn ghost sm" onClick={doSkipSet} disabled={!!mw}>Force-end current set →</button>
+          {match.phase === "over" && (
+            <button className="btn crimson sm" onClick={doReopenMatch}>Re-open match</button>
+          )}
+          <div className="spacer" />
+          <span className="tip">Owner: {match.ownerName || "—"} · id {match.ownerId ? match.ownerId.slice(0,8) : "—"}</span>
+        </div>
+      )}
+
       <HistoryPanel match={match} />
 
       {/* Set modal */}
@@ -203,9 +278,11 @@ function Scoreboard({ match, onUpdate, onClose }) {
           Sets {match.p1.setsWon} – {match.p2.setsWon} &nbsp;·&nbsp; first to {neededSets} &nbsp;·&nbsp; {fmtTime(elapsed)}
         </div>
         <div className="modal-actions">
-          <button className="btn primary" onClick={() => { doResetMatch(); setMatchModal(false); }}>
-            Rematch
-          </button>
+          {canEdit && (
+            <button className="btn primary" onClick={() => { doResetMatch(); setMatchModal(false); }}>
+              Rematch
+            </button>
+          )}
           <button className="btn ghost" onClick={() => setMatchModal(false)}>Review Board</button>
         </div>
       </Modal>
@@ -215,26 +292,18 @@ function Scoreboard({ match, onUpdate, onClose }) {
 
 function PlayerCard({ player, playerKey, match, leading, winner, breakPlayer }) {
   const cls = `player-card ${leading ? "leading" : ""} ${winner ? "winner-match" : ""}`;
-  const displayName = cleanName(player && player.name, playerKey === "p1" ? "Player One" : "Player Two");
-  const displayLabel = player && player.label ? player.label : "";
-  const color = cleanName(player && player.color, playerKey === "p1" ? "White" : "Black");
-  const members = player && Array.isArray(player.members)
-    ? player.members.map(n => cleanName(n, "")).filter(Boolean)
-    : [];
-  const setPts = Number(player && player.setPts) || 0;
-  const setsWon = Number(player && player.setsWon) || 0;
   return (
     <div className={cls}>
       <div className="player-head">
-        <Avatar name={displayName} color={color} />
+        <Avatar name={player.name} color={player.color} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="player-name">{displayName}</div>
-          {displayLabel && <div className="player-label eyebrow">{displayLabel}</div>}
-          {match.matchType === "doubles" && members.length > 1 && (
-            <div className="member-list">{members.join(" + ")}</div>
+          <div className="player-name">{player.name}</div>
+          {player.label && <div className="player-label eyebrow">{player.label}</div>}
+          {match.matchType === "doubles" && player.members?.length > 1 && (
+            <div className="member-list">{player.members.join(" + ")}</div>
           )}
           <div className="player-meta">
-            <span className="chip"><Coin color={color.toLowerCase()} size={10} /> {color}</span>
+            <span className="chip"><Coin color={player.color.toLowerCase()} size={10} /> {player.color}</span>
             {breakPlayer === playerKey && <span className="chip break">Breaks</span>}
           </div>
         </div>
@@ -243,12 +312,12 @@ function PlayerCard({ player, playerKey, match, leading, winner, breakPlayer }) 
       <div className="score-rows">
         <div className="score-cell">
           <div className="eyebrow">Set points</div>
-          <div className="num">{setPts}</div>
+          <div className="num">{player.setPts}</div>
         </div>
         <div className="score-cell">
           <div className="eyebrow">Sets won</div>
-          <div className="num small">{setsWon}</div>
-          <SetPips won={setsWon} max={matchSetsToWin(match)} />
+          <div className="num small">{player.setsWon}</div>
+          <SetPips won={player.setsWon} max={Number(match.setsToWin) || setsNeeded(match)} />
         </div>
       </div>
     </div>

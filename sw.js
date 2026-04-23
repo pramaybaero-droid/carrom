@@ -1,13 +1,9 @@
 // Simple service worker: cache shell, network-first for APIs
-const CACHE = "striker-v11";
+const CACHE = "striker-v5";
 const SHELL = [
   "./",
   "./index.html",
   "./manifest.webmanifest",
-  "./vendor/react.production.min.js",
-  "./vendor/react-dom.production.min.js",
-  "./vendor/supabase.min.js",
-  "./src/bundle.js",
   "./src/util.jsx",
   "./src/store.jsx",
   "./src/parts.jsx",
@@ -43,19 +39,6 @@ self.addEventListener("fetch", (e) => {
       url.hostname.includes("gstatic.com")) return;
 
   if (e.request.method !== "GET") return;
-
-  if (e.request.mode === "navigate" || (e.request.headers.get("accept") || "").includes("text/html")) {
-    e.respondWith(
-      fetch(e.request).then(res => {
-        if (res && res.status === 200 && res.type === "basic") {
-          const copy = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, copy));
-        }
-        return res;
-      }).catch(() => caches.match(e.request).then(cached => cached || caches.match("./index.html")))
-    );
-    return;
-  }
 
   e.respondWith(
     caches.match(e.request).then(cached => {

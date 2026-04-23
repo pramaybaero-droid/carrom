@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Striker — Admin Setup</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0; padding: 40px 20px;
+    background: #150c05;
+    color: #fbf5e8;
+    font: 16px/1.5 system-ui, -apple-system, sans-serif;
+    display: flex; justify-content: center;
+  }
+  .wrap { width: min(720px, 100%); }
+  h1 { font-size: 32px; margin: 0 0 6px; font-family: 'Instrument Serif', Georgia, serif; font-style: italic; }
+  .lede { color: #c6b89a; margin: 0 0 28px; }
+  .card { background: #1e130a; border: 1px solid rgba(255,241,205,0.15); border-radius: 16px; padding: 22px; margin-bottom: 16px; }
+  label { display: block; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: #c8a65a; font-weight: 700; margin-bottom: 6px; }
+  input { width: 100%; font: inherit; padding: 12px 14px; border-radius: 10px; background: rgba(0,0,0,0.35); color: #fbf5e8; border: 1px solid rgba(255,241,205,0.15); }
+  input:focus { outline: none; border-color: #c8a65a; }
+  .pin { letter-spacing: 0.4em; font-family: 'JetBrains Mono', monospace; }
+  .out { background: #0b0603; border: 1px solid rgba(200,166,90,0.3); border-radius: 10px; padding: 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #fbf5e8; word-break: break-all; white-space: pre-wrap; }
+  .out.empty { color: #8b7e66; font-style: italic; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 999px; background: linear-gradient(180deg, #c8a65a, #a3823b); color: #1a1108; border: none; font: 700 13px/1 system-ui; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; }
+  .btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+  .tip { color: #c6b89a; font-size: 13px; }
+  ol { padding-left: 18px; }
+  ol li { margin: 6px 0; }
+  code { background: rgba(255,241,205,0.08); padding: 2px 6px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Striker · Admin setup</h1>
+  <p class="lede">Generate the two constants that lock admin rights to you and only you. Nothing is uploaded — all hashing happens in your browser.</p>
+
+  <div class="card">
+    <label for="name">Admin username</label>
+    <input id="name" placeholder="e.g. Raj" autocomplete="off" />
+    <p class="tip" style="margin-top: 8px;">Use exactly the username you will sign in with. Case doesn't matter.</p>
+  </div>
+
+  <div class="card">
+    <label for="pin">Admin PIN (4–8 digits)</label>
+    <input id="pin" class="pin" type="password" inputmode="numeric" pattern="[0-9]*" placeholder="••••" autocomplete="off" />
+    <p class="tip" style="margin-top: 8px;">This is separate from your sign-in PIN. Only the hash is stored in code — the PIN itself is never saved.</p>
+  </div>
+
+  <div class="card">
+    <label>Paste these two lines into <code>src/cloud.jsx</code></label>
+    <div id="out" class="out empty">Fill both fields above.</div>
+    <div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
+      <button class="btn" id="copy" disabled>Copy to clipboard</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <label>Steps</label>
+    <ol class="tip">
+      <li>Open <code>src/cloud.jsx</code>.</li>
+      <li>Find the <code>ADMIN CONFIGURATION</code> block near the top.</li>
+      <li>Replace the two placeholder lines with the generated lines above.</li>
+      <li>Save and reload the app.</li>
+      <li>Sign in with the username you picked, then tap <strong>Admin</strong> and enter your PIN.</li>
+    </ol>
+  </div>
+</div>
+
+<script>
+const nameEl = document.getElementById("name");
+const pinEl  = document.getElementById("pin");
+const outEl  = document.getElementById("out");
+const copyBtn = document.getElementById("copy");
+
+pinEl.addEventListener("input", () => {
+  pinEl.value = pinEl.value.replace(/\D/g, "").slice(0, 8);
+  render();
+});
+nameEl.addEventListener("input", render);
+
+async function sha256(s) {
+  const buf = new TextEncoder().encode(s);
+  const h = await crypto.subtle.digest("SHA-256", buf);
+  return Array.from(new Uint8Array(h)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function render() {
+  const name = nameEl.value.trim();
+  const pin  = pinEl.value;
+  if (!name || pin.length < 4) {
+    outEl.className = "out empty";
+    outEl.textContent = name ? (pin ? "PIN needs at least 4 digits." : "Pick a PIN (4–8 digits).") : "Fill both fields above.";
+    copyBtn.disabled = true;
+    return;
+  }
+  const hash = await sha256(`striker_admin_v1|${pin}`);
+  const nameLine = `const ADMIN_NAME = "${name.replace(/"/g, '\\"')}";`;
+  const hashLine = `const ADMIN_PIN_HASH = "${hash}";`;
+  outEl.className = "out";
+  outEl.textContent = nameLine + "\n" + hashLine;
+  copyBtn.disabled = false;
+  copyBtn.dataset.clip = nameLine + "\n" + hashLine;
+}
+
+copyBtn.addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(copyBtn.dataset.clip || "");
+    copyBtn.textContent = "Copied ✓";
+    setTimeout(() => { copyBtn.textContent = "Copy to clipboard"; }, 1500);
+  } catch { alert("Copy failed — select and copy manually."); }
+});
+</script>
+</body>
+</html>
