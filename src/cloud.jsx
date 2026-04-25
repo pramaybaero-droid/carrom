@@ -19,8 +19,8 @@ const SESSION_KEY = "striker.session.v1";
 //    2. Type your username (exactly as you'll sign in) and a 4–8 digit PIN.
 //    3. The page prints the two lines below — paste them in, save, reload.
 // =============================================================================
-const ADMIN_NAME = "__SET_YOUR_USERNAME__";
-const ADMIN_PIN_HASH = "__SET_YOUR_ADMIN_PIN_HASH__";
+const ADMIN_NAME = "pramay";
+const ADMIN_PIN_HASH = "a8b6d288e04703462db9528c9eacd5cf6651d8fa0b72af13903c082b2c392099";
 // =============================================================================
 
 const ADMIN_NAME_PLACEHOLDER = "__SET_YOUR_USERNAME__";
