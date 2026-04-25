@@ -243,8 +243,74 @@ function reopenMatch(m) {
   return { ...next, phase: "live", endedAt: null };
 }
 
+// Admin can switch score format (25/8 ↔ 15/4) and total sets (3 ↔ 1) mid-match.
+// Logic:
+//  - Apply the new caps (limitPoints, limitBoards, queenCutoff, totalSets, setsToWin).
+//  - Existing setPts and setsWon are preserved.
+//  - If the new totalSets makes the match already won → phase = "over".
+//  - If the match was previously "over" but the new totalSets means no winner yet → phase = "live".
+//  - If the new caps mean the current set is already complete (a player already met
+//    the new point cap, or boards played already reached the new boards cap) →
+//    finalize the current set, which may end the match.
+//  - Logs an "admin-format-change" entry in history for audit.
+function changeFormat(m, { scoreFormat, totalSets } = {}) {
+  let next = pushUndo(m);
+
+  if (scoreFormat && SCORE_FORMATS[scoreFormat]) {
+    const rules = scoreRules(scoreFormat);
+    next = {
+      ...next,
+      scoreFormat,
+      limitPoints: rules.limitPoints,
+      limitBoards: rules.limitBoards,
+      queenCutoff: rules.queenCutoff,
+    };
+  }
+
+  if (totalSets != null) {
+    const tc = safeTotalSets(totalSets);
+    next = { ...next, totalSets: tc, setsToWin: setsNeeded(tc) };
+  }
+
+  next = {
+    ...next,
+    history: [...next.history, {
+      kind: "admin-format-change",
+      at: Date.now(),
+      set: next.setNo,
+      board: next.boardNo,
+      scoreFormat: next.scoreFormat,
+      limitPoints: next.limitPoints,
+      limitBoards: next.limitBoards,
+      queenCutoff: next.queenCutoff,
+      totalSets: next.totalSets,
+      setsToWin: next.setsToWin,
+    }],
+  };
+
+  // Did the new totalSets already crown a winner?
+  const mw = matchWinner(next);
+  if (mw) {
+    return { ...next, phase: "over", endedAt: next.endedAt || Date.now() };
+  }
+  // Was previously over, but no longer (e.g. went from 1-set to 3-set)?
+  if (next.phase === "over") {
+    next = { ...next, phase: "live", endedAt: null };
+  }
+
+  // Does the current set need to finalize under the new caps?
+  const limit  = matchLimitPoints(next);
+  const lboards = matchLimitBoards(next);
+  const endedPts    = next.p1.setPts >= limit || next.p2.setPts >= limit;
+  const endedBoards = next.boardNo > lboards;
+  if (endedPts || endedBoards) {
+    next = finalizeSet(next);
+  }
+  return next;
+}
+
 Object.assign(window, {
   useStore, pushUndo, popUndo, awardBoard, finalizeSet,
   resetSet, resetMatch, swapPlayers,
-  rollbackLastSet, skipToNextSet, reopenMatch,
+  rollbackLastSet, skipToNextSet, reopenMatch, changeFormat,
 });

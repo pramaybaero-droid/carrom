@@ -27,6 +27,7 @@ Both values live in `src/cloud.jsx`. Until you edit them away from their placeho
 Admin adds these powers on top of full editing on any match:
 - **Rollback last set** — un-finalize the most recently completed set
 - **Force-end current set** — end the set immediately, whoever's ahead takes it
+- **Change format…** — switch between 25-point/8-board and 15-point/4-board scoring, and switch between 1-set and 3-set matches, mid-game. Existing scores and sets-won are preserved. The modal previews any side-effects (e.g. "match will end immediately" or "current set will finalize") before you confirm. Every change is logged in match history with a timestamp.
 - **Re-open match** — turn a finished match back to "live" for editing
 - **Delete match** from the Leaderboard
 

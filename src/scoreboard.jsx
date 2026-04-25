@@ -23,6 +23,7 @@ function Scoreboard({ match, onUpdate, onClose, session, isAdmin }) {
   const [confettiKey, setConfettiKey] = React.useState(0);
   const [setModal, setSetModal]       = React.useState(null);
   const [matchModal, setMatchModal]   = React.useState(false);
+  const [formatModal, setFormatModal] = React.useState(false);
 
   const elapsed      = useMatchTimer(match);
   const limitPoints  = matchLimitPoints(match);
@@ -240,6 +241,7 @@ function Scoreboard({ match, onUpdate, onClose, session, isAdmin }) {
           <span className="eyebrow" style={{ color: "var(--queen)", marginRight: 6 }}>Admin</span>
           <button className="btn ghost sm" onClick={doRollbackLastSet}>← Rollback last set</button>
           <button className="btn ghost sm" onClick={doSkipSet} disabled={!!mw}>Force-end current set →</button>
+          <button className="btn ghost sm" onClick={() => setFormatModal(true)}>Change format…</button>
           {match.phase === "over" && (
             <button className="btn crimson sm" onClick={doReopenMatch}>Re-open match</button>
           )}
@@ -286,6 +288,123 @@ function Scoreboard({ match, onUpdate, onClose, session, isAdmin }) {
           <button className="btn ghost" onClick={() => setMatchModal(false)}>Review Board</button>
         </div>
       </Modal>
+
+      {/* Admin: change format / sets mid-match */}
+      <ChangeFormatModal
+        open={formatModal}
+        onClose={() => setFormatModal(false)}
+        match={match}
+        onApply={(opts) => { onUpdate(m => changeFormat(m, opts)); setFormatModal(false); }}
+      />
+    </div>
+  );
+}
+
+// Lets admin change scoring format (25/8 or 15/4) and total sets (1 or 3) mid-match.
+// Shows a preview of what will happen if the change is applied right now.
+function ChangeFormatModal({ open, onClose, match, onApply }) {
+  const [scoreFormat, setScoreFormat] = React.useState(match.scoreFormat || "standard");
+  const [totalSets, setTotalSets]     = React.useState(safeTotalSets(match.totalSets));
+
+  // Reset selection whenever the modal is opened to reflect the current match
+  React.useEffect(() => {
+    if (open) {
+      setScoreFormat(match.scoreFormat || "standard");
+      setTotalSets(safeTotalSets(match.totalSets));
+    }
+  }, [open, match.scoreFormat, match.totalSets]);
+
+  if (!open) return null;
+
+  const newRules = scoreRules(scoreFormat);
+  const newSetsToWin = setsNeeded(totalSets);
+  const changed = scoreFormat !== match.scoreFormat || totalSets !== safeTotalSets(match.totalSets);
+
+  // Preview: would applying this change immediately alter the match state?
+  const warnings = [];
+  if (changed) {
+    if (match.p1.setsWon >= newSetsToWin) {
+      warnings.push(`Match will end immediately — ${match.p1.name} already has ${match.p1.setsWon} set${match.p1.setsWon === 1 ? "" : "s"} won (≥ ${newSetsToWin} needed).`);
+    } else if (match.p2.setsWon >= newSetsToWin) {
+      warnings.push(`Match will end immediately — ${match.p2.name} already has ${match.p2.setsWon} set${match.p2.setsWon === 1 ? "" : "s"} won (≥ ${newSetsToWin} needed).`);
+    } else if (match.phase === "over") {
+      warnings.push("Match will be re-opened — neither player has enough sets won under the new rules.");
+    }
+    if (match.phase === "live" || match.phase === "over") {
+      const p1Reached = match.p1.setPts >= newRules.limitPoints;
+      const p2Reached = match.p2.setPts >= newRules.limitPoints;
+      const boardReached = match.boardNo > newRules.limitBoards;
+      if (p1Reached || p2Reached || boardReached) {
+        const lead = match.p1.setPts > match.p2.setPts ? match.p1.name
+                   : match.p2.setPts > match.p1.setPts ? match.p2.name : null;
+        warnings.push(
+          `Current Set ${match.setNo} will end immediately under the new caps` +
+          (lead ? ` — ${lead} takes the set.` : " — set is tied (no winner).")
+        );
+      }
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ padding: "28px 26px", maxWidth: 520 }}>
+        <div className="stinger crimson">Admin · Change Format</div>
+        <h2 style={{ fontSize: 30, marginTop: 4 }}>Adjust <em>match rules</em></h2>
+        <p className="tip" style={{ margin: "6px 0 16px" }}>
+          Existing scores and sets-won are preserved. The change is logged in match history.
+        </p>
+
+        <div className="eyebrow" style={{ marginBottom: 8 }}>Scoring format</div>
+        <div className="row" style={{ gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+          {Object.entries(SCORE_FORMATS).map(([key, rules]) => (
+            <button key={key} type="button"
+                    className={`btn ${scoreFormat === key ? "primary" : "ghost"} sm`}
+                    onClick={() => setScoreFormat(key)}>
+              {rules.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="eyebrow" style={{ marginBottom: 8 }}>Sets per match</div>
+        <div className="row" style={{ gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+          {[1, 3].map(n => (
+            <button key={n} type="button"
+                    className={`btn ${totalSets === n ? "primary" : "ghost"} sm`}
+                    onClick={() => setTotalSets(n)}>
+              {n === 1 ? "1 set (single shot)" : "3 sets (best of 3)"}
+            </button>
+          ))}
+        </div>
+
+        <div className="panel" style={{ padding: "10px 14px", margin: "8px 0 14px", background: "rgba(0,0,0,0.25)" }}>
+          <div className="tip" style={{ fontSize: 13 }}>
+            <strong>Now:</strong> {scoreRules(match.scoreFormat).label} · {safeTotalSets(match.totalSets)} set{safeTotalSets(match.totalSets) === 1 ? "" : "s"} (first to {setsNeeded(safeTotalSets(match.totalSets))})
+          </div>
+          <div className="tip" style={{ fontSize: 13, marginTop: 4 }}>
+            <strong>After:</strong> {newRules.label} · {totalSets} set{totalSets === 1 ? "" : "s"} (first to {newSetsToWin})
+          </div>
+        </div>
+
+        {warnings.length > 0 && (
+          <div className="banner" style={{ borderColor: "var(--queen-2)", background: "rgba(201,52,76,0.08)", marginBottom: 14 }}>
+            <span style={{ color: "var(--queen)" }}>⚠</span>
+            <div>
+              <strong>Heads up:</strong>
+              <ul style={{ margin: "4px 0 0 18px", padding: 0 }}>
+                {warnings.map((w, i) => <li key={i}>{w}</li>)}
+              </ul>
+            </div>
+          </div>
+        )}
+
+        <div className="modal-actions">
+          <button className="btn ghost" onClick={onClose}>Cancel</button>
+          <button className="btn primary" disabled={!changed}
+                  onClick={() => onApply({ scoreFormat, totalSets })}>
+            Apply changes
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -358,6 +477,18 @@ function HistoryPanel({ match }) {
                       <tr key={i} className="set-row">
                         <td colSpan={10}>
                           — Set {h.set} to {h.winnerName} · final {h.finalA}–{h.finalB} —
+                        </td>
+                      </tr>
+                    );
+                  }
+                  if (h.kind === "admin-format-change") {
+                    const fmtLabel = (SCORE_FORMATS[h.scoreFormat] || SCORE_FORMATS.standard).label;
+                    return (
+                      <tr key={i} className="set-row">
+                        <td colSpan={10} style={{ color: "var(--queen)", fontStyle: "italic" }}>
+                          ⚙ Admin changed format to {fmtLabel} · {h.totalSets} set{h.totalSets === 1 ? "" : "s"} (first to {h.setsToWin})
+                          {" · "}
+                          {new Date(h.at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
                         </td>
                       </tr>
                     );
