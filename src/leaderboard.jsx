@@ -50,8 +50,8 @@ function Leaderboard({ session, onOpenMatch, isAdmin, onDelete }) {
 }
 
 function computeStats(rows) {
-  const players = new Map(); // name -> { wins, losses, matches, setsWon, setsLost, bestStreak, currentStreak }
-  const h2h = new Map();     // "A|B" -> { a, b, wins_a, wins_b, matches }
+  const players = new Map(); // canonical name -> stats
+  const h2h = new Map();     // "A|B" of canonical names -> rivalry record
   const finished = rows.filter(r => r.winner_name);
   // Process in chronological order for streaks
   const chrono = [...finished].sort((a,b) => new Date(a.ended_at||a.updated_at) - new Date(b.ended_at||b.updated_at));
@@ -62,15 +62,20 @@ function computeStats(rows) {
   };
 
   for (const r of chrono) {
-    const a = getP(r.p1_name), b = getP(r.p2_name);
+    // Canonicalize so "A / B" and "B / A" merge into one team.
+    const p1 = canonTeamName(r.p1_name);
+    const p2 = canonTeamName(r.p2_name);
+    const winner = canonTeamName(r.winner_name);
+
+    const a = getP(p1), b = getP(p2);
     a.matches++; b.matches++;
     a.setsWon += r.p1_sets_won; a.setsLost += r.p2_sets_won;
     b.setsWon += r.p2_sets_won; b.setsLost += r.p1_sets_won;
-    if (r.winner_name === r.p1_name) {
+    if (winner === p1) {
       a.wins++; b.losses++;
       a.currentStreak = Math.max(1, a.currentStreak+1);
       b.currentStreak = 0;
-    } else if (r.winner_name === r.p2_name) {
+    } else if (winner === p2) {
       b.wins++; a.losses++;
       b.currentStreak = Math.max(1, b.currentStreak+1);
       a.currentStreak = 0;
@@ -78,13 +83,13 @@ function computeStats(rows) {
     a.bestStreak = Math.max(a.bestStreak, a.currentStreak);
     b.bestStreak = Math.max(b.bestStreak, b.currentStreak);
 
-    const [x, y] = [r.p1_name, r.p2_name].sort();
+    const [x, y] = [p1, p2].sort();
     const key = `${x}|${y}`;
     if (!h2h.has(key)) h2h.set(key, { a: x, b: y, wins_a: 0, wins_b: 0, matches: 0 });
     const rec = h2h.get(key);
     rec.matches++;
-    if (r.winner_name === x) rec.wins_a++;
-    else if (r.winner_name === y) rec.wins_b++;
+    if (winner === x) rec.wins_a++;
+    else if (winner === y) rec.wins_b++;
   }
 
   return {
@@ -136,27 +141,32 @@ function RecentFeed({ rows, onOpen, isAdmin, onDelete }) {
           </tr>
         </thead>
         <tbody>
-          {rows.map(r => (
-            <tr key={r.id}>
-              <td className="mono" style={{ color: "var(--muted)" }}>{fmtDate(r.updated_at)}</td>
-              <td>{r.p1_name} vs {r.p2_name}</td>
-              <td className="mono">{r.p1_sets_won} – {r.p2_sets_won}</td>
-              <td>{r.winner_name ? <span className="winner-badge">{r.winner_name}</span> : "—"}</td>
-              <td>
-                <span className={`chip ${r.winner_name?"":""}`}
-                      style={{ color: r.winner_name?"var(--gold)":"var(--muted)" }}>
-                  {r.winner_name ? "Final" : r.phase}
-                </span>
-              </td>
-              <td style={{ textAlign: "right" }}>
-                <button className="btn ghost sm" onClick={() => onOpen && onOpen(r)}>Open</button>
-                {isAdmin && (
-                  <button className="btn ghost sm" style={{ marginLeft: 6, color: "var(--queen)" }}
-                          onClick={() => onDelete && onDelete(r)}>Delete</button>
-                )}
-              </td>
-            </tr>
-          ))}
+          {rows.map(r => {
+            const p1 = canonTeamName(r.p1_name);
+            const p2 = canonTeamName(r.p2_name);
+            const winner = r.winner_name ? canonTeamName(r.winner_name) : null;
+            return (
+              <tr key={r.id}>
+                <td className="mono" style={{ color: "var(--muted)" }}>{fmtDate(r.updated_at)}</td>
+                <td>{p1} vs {p2}</td>
+                <td className="mono">{r.p1_sets_won} – {r.p2_sets_won}</td>
+                <td>{winner ? <span className="winner-badge">{winner}</span> : "—"}</td>
+                <td>
+                  <span className={`chip ${r.winner_name?"":""}`}
+                        style={{ color: r.winner_name?"var(--gold)":"var(--muted)" }}>
+                    {r.winner_name ? "Final" : r.phase}
+                  </span>
+                </td>
+                <td style={{ textAlign: "right" }}>
+                  <button className="btn ghost sm" onClick={() => onOpen && onOpen(r)}>Open</button>
+                  {isAdmin && (
+                    <button className="btn ghost sm" style={{ marginLeft: 6, color: "var(--queen)" }}
+                            onClick={() => onDelete && onDelete(r)}>Delete</button>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -197,9 +207,12 @@ function MonthlyStats({ rows }) {
     const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
     byMonth[key] = byMonth[key] || { month: key, matches: 0, players: new Set(), topPlayer: {} };
     byMonth[key].matches++;
-    byMonth[key].players.add(r.p1_name);
-    byMonth[key].players.add(r.p2_name);
-    if (r.winner_name) byMonth[key].topPlayer[r.winner_name] = (byMonth[key].topPlayer[r.winner_name] || 0) + 1;
+    byMonth[key].players.add(canonTeamName(r.p1_name));
+    byMonth[key].players.add(canonTeamName(r.p2_name));
+    if (r.winner_name) {
+      const w = canonTeamName(r.winner_name);
+      byMonth[key].topPlayer[w] = (byMonth[key].topPlayer[w] || 0) + 1;
+    }
   }
   const list = Object.values(byMonth).sort((a,b) => b.month.localeCompare(a.month));
   if (!list.length) return <div className="empty">No finished matches yet.</div>;

@@ -214,7 +214,12 @@ function App() {
     </span>
   );
 
-  const showAdminButton = adminConfigured() && isAdminEligible(session);
+  // Admin button is always visible to signed-in users.  The AdminPanel modal
+  // itself handles all gating: "not configured" / "not the admin account" /
+  // "wrong PIN".  Keeping the entry point visible makes setup discoverable —
+  // a user who hasn't yet edited cloud.jsx can tap Admin and see clear
+  // instructions in the modal instead of a missing button.
+  const showAdminButton = true;
 
   return (
     <>

@@ -48,6 +48,21 @@ function cleanName(name, fallback) {
   return n || fallback;
 }
 
+// Canonicalize a player or team name so that order of doubles members doesn't matter.
+// Singles names ("Pramay") pass through untouched.
+// Doubles names ("Pramay / Mrityunjay" and "Mrityunjay / Pramay") sort to the same
+// string ("Mrityunjay / Pramay") so the leaderboard treats them as one team.
+// Case-insensitive sort, but original casing is preserved for display.
+function canonTeamName(name) {
+  if (!name) return "";
+  const s = String(name).trim();
+  if (!s.includes("/")) return s;
+  const parts = s.split("/").map(p => p.trim()).filter(Boolean);
+  if (parts.length < 2) return s;
+  parts.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+  return parts.join(" / ");
+}
+
 function safeTotalSets(value) {
   return Number(value) === 1 ? 1 : 3;
 }
@@ -223,7 +238,7 @@ function chord(freqs, dur = 0.25) {
 Object.assign(window, {
   LIMIT_POINTS, LIMIT_BOARDS, QUEEN_CUTOFF, MAX_SETS, SCORE_FORMATS, STORAGE_KEY, ACTIVE_KEY,
   uid, initials, fmtTime, fmtDate,
-  cleanName, safeTotalSets, setsNeeded, scoreRules,
+  cleanName, safeTotalSets, setsNeeded, scoreRules, canonTeamName,
   matchLimitPoints, matchLimitBoards, matchQueenCutoff, queenBonusCounts,
   defaultMatch, matchWinner,
   persistAll, loadAll, exportJSON, exportCSV,
